@@ -6,13 +6,22 @@ Created on Tue Aug 11 14:36:13 2026
 
 @author: ezb0082
 
-aug12: establish fitting routine based on data colection code that built yesterday 
+aug12: establish fitting routine based on data reading code  
 """ 
 
-shotCount = 500 # CHANGE THIS TO HOW MANY SHOTS YOU TAKE !!!!
+# CHANGE THIS TO HOW MANY SAMPLES YOU TAKE !!!!
+shotCount = 500 
 
 # CHANGE THIS TO THE FOLDER LOCATION
 folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.07.16\\CO Hencken Burner\\test folder" 
+
+# This can be changed to better guess T and X
+T = 1000 # k
+X = 0.1 # CO mole fraction
+
+# change this to your experimental path length
+length = 2.54 # centimeters
+passes = 1 # number of passes for multipass
 
 #%% packages
 import os 
@@ -20,11 +29,43 @@ import numpy as np
 import matplotlib.pyplot as plt
 import hapi as hp
 
-from hapi import * 
 from scipy.optimize import minimize, Bounds
 from pybaselines import Baseline
 from pathlib import Path
 
+#%% functions
+
+def hapi_calculation(species,p, t, x, length, resltn, afwing, wnb, dnu):
+            nu, coef = hp.absorptionCoefficient_Voigt(SourceTables=species,    # calculate voigt absorption coefficient
+                                              WavenumberRange=(wnb),
+                                              WavenumberStep=(dnu),
+                                              Environment={'p':p, 'T':t}, 
+                                              Diluent={'Air':(1-x)},
+                                              HITRAN_units=False)   
+            coef_corrected = coef * x  # scale coefficent by mole fraction
+            nu, absorp = hp.absorptionSpectrum(nu,coef_corrected,  # calculate absorption from abs coeff                 
+                                              Environment={'l':length})  
+            wl_convolve = 1e7/nu # calculate wavelength 
+            wl_hapi, absorp_, i1, i2, slit = hp.convolveSpectrum(np.flip(wl_convolve),absorp, # convolve to insturment function   
+                                              SlitFunction=hp.SLIT_GAUSSIAN,
+                                              Resolution=resltn,AF_wing=afwing)
+            wl = np.flip(wl_hapi) # wavelength
+            
+            return wl, absorp_ 
+
+def objective(arguments, A_exp_wlc):
+      
+    # T, P, X, L = arguments[0], arguments[1], arguments[2], arguments[3] # pull t p x and l from the input array
+    T = arguments[0] # pull t from the input array
+    X = arguments[1] # pull t from the input array
+    
+    wl, A_sim = hapi_calculation('CO', P, T, X, length, resltn, afwing, wnb, dnu) # run Hcl calc for current condition
+
+    A_sim_c = np.interp(wlc, np.flip(wl), np.flip(A_sim)) # interpolate to common wavelength scale`
+
+    ssr = sum((A_exp_wlc - A_sim_c)** 2) # calculate r2
+
+    return ssr
 #%% ------------------------------------------------------------------------------------------------------------------
 #%% pick latest SIG file in folder CHANGE FOLDERNAME TO location !!!
 # most_recent_file = None # initiallize
@@ -50,7 +91,7 @@ from pathlib import Path
 # signal = np.mean(signal_list, axis=0) # take average of all shots
 
 #%% Read data as txt PRECONVERTED FROM GAGE .SIG FILE 
-# start = time.time()
+
 # folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.07.16\\CO Hencken Burner\\Ramp\\CO Cell"
 
 # signal_list = [] # allocate storage
@@ -62,13 +103,7 @@ from pathlib import Path
 # signal_list = np.array(signal_list) # append to array
 
 # signal = np.mean(signal_list, axis=0) # calc mean of all 500 frames
-# end = time.time()
 
-# elapsed = end - start
-
-# print(elapsed)
-
-# plt.plot(signal)
 
 #%% read data from .sig
 
@@ -82,9 +117,6 @@ realData = dat[256:len(dat)] / resolution
 signal_list = np.reshape(realData, (shotCount, -1))
 
 signal = np.mean(signal_list, axis=0)
-signal = signal 
-
-plt.plot(signal)
 
 #%% read data from .asc VOLTS 
 
@@ -94,7 +126,6 @@ plt.plot(signal)
 # signal_list = np.reshape(dat, (shotCount, -1))
 # signal = np.mean(signal_list, axis=0)
 
-# plt.plot(signal)
 
 #%% ---------------------------------------------------------------------------------------------------------------------
 #%% isolate just the signal 
@@ -138,5 +169,24 @@ absorption_C = absorption - bkg
 
 plt.figure()
 plt.plot(absorption_C)
+
 #%% wl axis
 
+sort_idx = np.argsort(x_narrow)
+xs = x_narrow[sort_idx]
+
+wavelength_exp = 2329.8425 + (0.62) * (xs - xs.min()) / (xs.max() - xs.min()) # By hand guess. Will be shifted to match the fit. 
+
+#%% FITTING 
+hp.db_begin('HAPI_DATA')
+
+total_pathLength = length * passes  # cm
+resltn = 0.0001 # cm-1
+afwing = resltn * 5  # instrument function width
+
+wnb = [4290, 4293]
+dnu = 0.000001 
+
+P = 1
+
+wl, cell_abs_sim = hapi_calculation('CO', P, T, X, total_pathLength, resltn, afwing, wnb, dnu)
