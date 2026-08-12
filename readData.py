@@ -166,4 +166,17 @@ axs[2].plot(x_narrow, fitted_BG, label="Background") # plot the fited backgroiun
 axs[2].title.set_text('Background Fitting')
 axs[2].legend()
 
+#%% transmission and absorption 
 
+transmission = sigMasked / fitted_BG # transmission I / Io 
+
+absorption = 1 - transmission # absortion 1- transmission
+
+fig, axs = plt.subplots(1, 2, figsize=[10,6])
+axs[0].plot(transmission)
+axs[0].title.set_text('Transmission')
+
+axs[1].plot(absorption)
+axs[1].title.set_text('Absorption')
+
+plt.show()
