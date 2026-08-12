@@ -16,7 +16,7 @@ shotCount = 500
 folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.07.16\\CO Hencken Burner\\test folder" 
 
 # This can be changed to better guess T and X
-T = 1000 # k
+T = 2000 # k
 X = 0.1 # CO mole fraction
 
 # change this to your experimental path length
@@ -32,6 +32,8 @@ import hapi as hp
 from scipy.optimize import minimize, Bounds
 from pybaselines import Baseline
 from pathlib import Path
+from scipy.signal import find_peaks
+
 
 #%% functions
 
@@ -66,6 +68,17 @@ def objective(arguments, A_exp_wlc):
     ssr = sum((A_exp_wlc - A_sim_c)** 2) # calculate r2
 
     return ssr
+
+def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
+    a1 = param[0]
+ 
+    waveAxis_shift =  waveAxis + a1
+    abs_sim_shift = np.interp(waveAxis_shift, simAxis, abs_sim)
+
+    residuals = abs_data - abs_sim_shift
+    residualrmse = np.sqrt(np.sum((residuals ** 2) / len(residuals)))  # root mean squared error
+ 
+    return residualrmse
 #%% ------------------------------------------------------------------------------------------------------------------
 #%% pick latest SIG file in folder CHANGE FOLDERNAME TO location !!!
 # most_recent_file = None # initiallize
@@ -167,17 +180,13 @@ bkg = np.polyval(poly, x_narrow)
 
 absorption_C = absorption - bkg 
 
-plt.figure()
-plt.plot(absorption_C)
-
 #%% wl axis
 
 sort_idx = np.argsort(x_narrow)
 xs = x_narrow[sort_idx]
 
-wavelength_exp = 2329.8425 + (0.62) * (xs - xs.min()) / (xs.max() - xs.min()) # By hand guess. Will be shifted to match the fit. 
+wavelength_exp = 2329.7 + 1.0385 * (xs - xs.min()) / (xs.max() - xs.min()) 
 
-#%% FITTING 
 hp.db_begin('HAPI_DATA')
 
 total_pathLength = length * passes  # cm
@@ -189,4 +198,41 @@ dnu = 0.000001
 
 P = 1
 
-wl, cell_abs_sim = hapi_calculation('CO', P, T, X, total_pathLength, resltn, afwing, wnb, dnu)
+wlc = np.arange(2329.95, 2330.5, 0.001)
+
+wl, absorp_sim = hapi_calculation('CO', P, T, X, length, resltn, afwing, wnb, dnu) # calculate absorp. for CEA values
+    
+A_sim_wlc = np.interp(wlc, np.flip(wl), np.flip(absorp_sim))
+
+bnds = Bounds([-1e6], [1e6])
+init = [1e-3]
+wl_fit_result = minimize(wl_axis_cal, init, bounds=bnds, tol= 1e-6, method='Nelder-Mead', args=(wavelength_exp, wlc, A_sim_wlc, absorption_C))
+wl_axis_fit =  wavelength_exp + wl_fit_result.x[0]
+
+A_exp_wlc = np.interp(wlc, wl_axis_fit, absorption_C) 
+plt.figure()
+plt.plot(wlc, A_exp_wlc)
+plt.plot(wlc, A_sim_wlc)
+#%%
+bnds = Bounds([T-2000, X - 0.195], # lower bounds
+              [T+2000, X + 0.25]) # upper bounds
+    
+initial_guess = [T, X ] # initial guess t=290K, p=1atm, x=0.3, l = 5 (given cell values)
+
+result = minimize(objective, initial_guess, bounds=bnds, tol=1e-4, method='Nelder-Mead', args=(A_exp_wlc)) # run minimizing routine
+
+print(result) # print minimizing routine results
+
+T_fit =  result.x[0] # read result for T
+X_fit = result.x[1] # read result for P
+
+wl_min, A_minimized = hapi_calculation('CO', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at minimized T,P,X,and L
+
+A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
+    
+plt.figure()
+plt.plot(wlc, A_min_wlc, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
+plt.plot(wlc, A_exp_wlc , label='Exp.')
+plt.legend()
+
+plt.show()
