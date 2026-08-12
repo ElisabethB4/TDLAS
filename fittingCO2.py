@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
-""" 
-CO TDLAS FITTING FOR TEMPERATURE AND MOLE FRACTION OF CO 
+"""
+TDLAS FITTING FOR TEMPERATURE AND MOLE FRACTION OF CO2
 
-Created on Tue Aug 11 14:36:13 2026
+Created on Wed Aug 12 16:12:21 2026
 
 @author: ezb0082
 
 aug12: establish fitting routine based on data reading code  
-""" 
 
+"""
 # CHANGE THIS TO HOW MANY SAMPLES YOU TAKE !!!!
 shotCount = 500 
 
@@ -32,7 +32,7 @@ import hapi as hp
 from scipy.optimize import minimize, Bounds
 from pybaselines import Baseline
 from pathlib import Path
-
+from scipy.signal import find_peaks
 #%% functions
 
 def hapi_calculation(species,p, t, x, length, resltn, afwing, wnb, dnu):
@@ -115,7 +115,6 @@ signal = np.mean(signal_list, axis=0) # take average of all shots
 
 # signal = np.mean(signal_list, axis=0) # calc mean of all 500 frames
 
-
 #%% read data from .sig
 
 # f = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.07.16\\CO Hencken Burner\\Ramp\\CO_42.75degC_height_5mm_1kHz_ramp_phi_2.sig"
@@ -149,7 +148,7 @@ sigMasked = signal[x_mask] # isolate the signal
 
 #%% pick the background
 
-bg_fit_mask = ((x_narrow <= 34500) | (x_narrow >= 44500))   # implement mask
+bg_fit_mask = ((x_narrow <= 33750) | (x_narrow >= 44500)) # implement mask
 # CO CELL FEATURE MASK: ((x_narrow <= 31000) | (x_narrow >= 44500)) 
 # HENCKEN BURNER CO FEATURE: ((x_narrow <= 33750) | (x_narrow >= 44500)) 
 
@@ -178,58 +177,56 @@ bkg = np.polyval(poly, x_narrow)
 
 absorption_C = absorption - bkg 
 
-#%% temperature and mole fraction fitting
+#%% wl axis
+# sort_idx = np.argsort(x_narrow)
+# xs = x_narrow[sort_idx]
 
-sort_idx = np.argsort(x_narrow) # sort the x axis 
-xs = x_narrow[sort_idx] 
+# wavelength_exp = 2329.7 + 1.02 * (xs - xs.min()) / (xs.max() - xs.min()) 
 
-wavelength_exp = 2329.7 + 1.02 * (xs - xs.min()) / (xs.max() - xs.min()) # build wl axis initial gues
+# hp.db_begin('HAPI_DATA')
 
-hp.db_begin('HAPI_DATA') # initialize hapi database
+# total_pathLength = length * passes  # cm
+# resltn = 0.0001 # cm-1
+# afwing = resltn * 5  # instrument function width
 
-total_pathLength = length * passes  # cm
-resltn = 0.0001 # cm-1
-afwing = resltn * 5  # instrument function width
+# wnb = [4290, 4293]
+# dnu = 0.000001 
 
-wnb = [4290, 4293] # ~ 2329 nm to 2330 nm CO feature range
-dnu = 0.00001 # wavenumber stepsize, must be less than resolution
+# P = 1
 
-P = 1 # PRessure in atm 
+# wlc = np.arange(2329.95, 2330.5, 0.001)
 
-wlc = np.arange(2329.95, 2330.5, 0.001) # establish common wavelengthj sacle 
-
-wl, absorp_sim = hapi_calculation('CO', P, T, X, length, resltn, afwing, wnb, dnu) # calculate absorp. for CEA values
+# wl, absorp_sim = hapi_calculation('CO', P, T, X, length, resltn, afwing, wnb, dnu) # calculate absorp. for CEA values
     
-A_sim_wlc = np.interp(wlc, np.flip(wl), np.flip(absorp_sim)) # interpolate simulated spectrra to common scale
+# A_sim_wlc = np.interp(wlc, np.flip(wl), np.flip(absorp_sim))
 
-bnds = Bounds([-1e6], [1e6]) # bounds for wl axis fitting
-init = [1e-3] # initial guess for wl axis fitting
-wl_fit_result = minimize(wl_axis_cal, init, bounds=bnds, tol= 1e-6, method='Nelder-Mead', args=(wavelength_exp, wlc, A_sim_wlc, absorption_C)) # fit the wavelength axis 
-wl_axis_fit =  wavelength_exp + wl_fit_result.x[0] # adjust wl axis
+# bnds = Bounds([-1e6], [1e6])
+# init = [1e-3]
+# wl_fit_result = minimize(wl_axis_cal, init, bounds=bnds, tol= 1e-6, method='Nelder-Mead', args=(wavelength_exp, wlc, A_sim_wlc, absorption_C))
+# wl_axis_fit =  wavelength_exp + wl_fit_result.x[0]
 
-A_exp_wlc = np.interp(wlc, wl_axis_fit, absorption_C) # interpolate experimental spectra to common scale using fitted wl axis
+# A_exp_wlc = np.interp(wlc, wl_axis_fit, absorption_C) 
 
-bnds = Bounds([200, 0.01], # lower bounds
-              [4000, 1]) # upper bounds
+# #%% Fitting 
+# bnds = Bounds([200, 0.01], # lower bounds
+#               [4000, 1]) # upper bounds
     
-initial_guess = [T, X ] # initial guess for flame  condtions
+# initial_guess = [T, X ] # initial guess t=290K, p=1atm, x=0.3, l = 5 (given cell values)
 
-result = minimize(objective, initial_guess, bounds=bnds, tol=1e-4, method='Nelder-Mead', args=(A_exp_wlc)) # run minimizing routine for  speactrra fittig
+# result = minimize(objective, initial_guess, bounds=bnds, tol=1e-4, method='Nelder-Mead', args=(A_exp_wlc)) # run minimizing routine
 
-print(result) # print minimizing routine results
+# print(result) # print minimizing routine results
 
-T_fit =  result.x[0] # read result for T
-X_fit = result.x[1] # read result for X
+# T_fit =  result.x[0] # read result for T
+# X_fit = result.x[1] # read result for P
 
-wl_min, A_minimized = hapi_calculation('CO', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at fitted t and x
+# wl_min, A_minimized = hapi_calculation('CO', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at minimized T,P,X,and L
 
-A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
+# A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
     
-plt.figure() # plot
-plt.plot(wlc, A_min_wlc, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
-plt.plot(wlc, A_exp_wlc , label='Exp.')
-plt.legend()
-plt.title("Experimental and Fitted Spectra")
-plt.xlabel("Wavelength (nm)")
-plt.ylabel("Absorption")
-plt.show()
+# plt.figure()
+# plt.plot(wlc, A_min_wlc, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
+# plt.plot(wlc, A_exp_wlc , label='Exp.')
+# plt.legend()
+
+# plt.show()
