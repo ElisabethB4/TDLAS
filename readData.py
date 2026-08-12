@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 from pybaselines import Baseline
 from pathlib import Path
 from random import randint
+#%% ----------------------------------------------------------------------------------------------------------------------
 #%% pick latest SIG file in folder CHANGE FOLDERNAME TO location !!!
 most_recent_file = None # initiallize
 most_recent_time = 0  # initialize
