@@ -13,10 +13,10 @@ aug12: establish fitting routine based on data reading code
 shotCount = 100 
 
 # CHANGE THIS TO THE FOLDER LOCATION
-folderName = "C:\\Users\\elisa\\Downloads\\CO2_38degC_800kHz_120mA"
+folderName = "C:\\Users\\ezb0082\\Downloads\\CO2_38degC_800kHz_120mA"
 # This can be changed to better guess T and X
 T = 2000 # k
-X = 0.1 # CO mole fraction
+X = 0.1 # CO2 mole fraction guess
 
 # change this to your experimental path length
 length = 2.54 # centimeters
@@ -137,12 +137,13 @@ def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
 # signal = np.mean(signal_list, axis=0)
 #%% Read data from .mat 
 signal_list = []
-folderName = "C:\\Users\\elisa\\Downloads\\CO2_38degC_800kHz_120mA"
+
 for frame in range(1,shotCount+1):
     fName = "CO2_38degC_800kHz_120mA_{frame:03d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
     dat = loadmat(fPath)
-    signal_list.append(dat)
+    datSignal = dat["A"]
+    signal_list.append(datSignal)
 signal_list = np.array(signal_list)
 signal = np.mean(signal_list, axis=0)
 #%% ---------------------------------------------------------------------------------------------------------------------
@@ -204,7 +205,7 @@ absorption_C = absorption - bkg
 
 # wlc = np.arange(2329.95, 2330.5, 0.001)
 
-# wl, absorp_sim = hapi_calculation('CO', P, T, X, length, resltn, afwing, wnb, dnu) # calculate absorp. for CEA values
+# wl, absorp_sim = hapi_calculation('CO2', P, T, X, length, resltn, afwing, wnb, dnu) # calculate absorp. for CEA values
     
 # A_sim_wlc = np.interp(wlc, np.flip(wl), np.flip(absorp_sim))
 

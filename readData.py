@@ -97,7 +97,6 @@ signal = np.mean(signal_list, axis=0) # take average of all shots
 # signal = signal 
 
 # plt.plot(signal)
-
 #%% read data from .asc VOLTS 
 
 # f = "C:\\Users\\ezb0082\\Downloads\\2026.08.11\\testGageScopeSaveVolts03.asc"
@@ -108,6 +107,17 @@ signal = np.mean(signal_list, axis=0) # take average of all shots
 
 # plt.plot(signal)
 
+#%% Read data from .mat 
+# signal_list = []
+
+# for frame in range(1,shotCount+1):
+#     fName = "CO2_38degC_800kHz_120mA_{frame:03d}.mat".format(frame=frame)
+#     fPath = Path(folderName, fName)
+#     dat = loadmat(fPath)
+#     datSignal = dat["A"]
+#     signal_list.append(datSignal)
+# signal_list = np.array(signal_list)
+# signal = np.mean(signal_list, axis=0)
 #%% ---------------------------------------------------------------------------------------------------------------------
 #%% pick and plot 10 frames
 
