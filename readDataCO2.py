@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """ 
-CO TDLAS NO FITTING JUST FOR PLOTTING ON THE FLY 
+CO2 TDLAS NO FITTING JUST FOR PLOTTING ON THE FLY 
 
 Created on Tue Aug 11 14:36:13 2026
 
@@ -15,7 +15,7 @@ PICKING LATEST FILE ONLY WORKS FOR .SIG!!!!!
 shotCount = 500 # CHANGE THIS TO HOW MANY SHOTS YOU TAKE !!!!
 
 # CHANGE THIS TO THE FOLDER LOCATION
-folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.07.16\\CO Hencken Burner\\test folder" 
+folderName = "C:\\Users\\ezb0082\\Downloads\\phi_1_height_ (5)"
 
 #%% packages
 import os 
@@ -25,29 +25,30 @@ import matplotlib.pyplot as plt
 from pybaselines import Baseline
 from pathlib import Path
 from random import randint
+from scipy.io import loadmat
 #%% ----------------------------------------------------------------------------------------------------------------------
 #%% pick latest SIG file in folder CHANGE FOLDERNAME TO location !!!
-most_recent_file = None # initiallize
-most_recent_time = 0  # initialize
+# most_recent_file = None # initiallize
+# most_recent_time = 0  # initialize
 
-for entry in os.scandir(folderName): # loop through folder
-    if entry.is_file(): # check file
-        mod_time = entry.stat().st_mtime_ns # ch3eck time
-        if mod_time > most_recent_time: # compare tiems
-            most_recent_file = entry.name # update file name
-            most_recent_time = mod_time # update newest time
+# for entry in os.scandir(folderName): # loop through folder
+#     if entry.is_file(): # check file
+#         mod_time = entry.stat().st_mtime_ns # ch3eck time
+#         if mod_time > most_recent_time: # compare tiems
+#             most_recent_file = entry.name # update file name
+#             most_recent_time = mod_time # update newest time
         
-fullPath = Path(folderName, most_recent_file) # combine path
-dat = np.memmap(fullPath, np.int16, 'r') # read data
-header = dat[0:256] # isolate header
+# fullPath = Path(folderName, most_recent_file) # combine path
+# dat = np.memmap(fullPath, np.int16, 'r') # read data
+# header = dat[0:256] # isolate header
 
-resolution = abs(int(header[150])) ## this is the factor to convert to volts !! 
+# resolution = abs(int(header[150])) ## this is the factor to convert to volts !! 
 
-realData = dat[256:len(dat)] / resolution # get real data 
+# realData = dat[256:len(dat)] / resolution # get real data 
 
-signal_list = np.reshape(realData, (shotCount, -1)) # reshape array, unstack all shots from being vertically stacked
+# signal_list = np.reshape(realData, (shotCount, -1)) # reshape array, unstack all shots from being vertically stacked
 
-signal = np.mean(signal_list, axis=0) # take average of all shots
+# signal = np.mean(signal_list, axis=0) # take average of all shots
 
 #%% Read data as txt PRECONVERTED FROM GAGE .SIG FILE 
 # folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.07.16\\CO Hencken Burner\\Ramp\\CO Cell"
@@ -108,16 +109,17 @@ signal = np.mean(signal_list, axis=0) # take average of all shots
 # plt.plot(signal)
 
 #%% Read data from .mat 
-# signal_list = []
+signal_list = []
 
-# for frame in range(1,shotCount+1):
-#     fName = "CO2_38degC_800kHz_120mA_{frame:03d}.mat".format(frame=frame)
-#     fPath = Path(folderName, fName)
-#     dat = loadmat(fPath)
-#     datSignal = dat["A"]
-#     signal_list.append(datSignal)
-# signal_list = np.array(signal_list)
-# signal = np.mean(signal_list, axis=0)
+for frame in range(1,shotCount+1):
+    fName = "phi_1_height_ (5)_{frame:03d}.mat".format(frame=frame)
+    fPath = Path(folderName, fName)
+    dat = loadmat(fPath)
+    datSignal = dat["A"]
+    datReduced = datSignal[:,0]
+    signal_list.append(datReduced)
+signal_list = np.array(signal_list)
+signal = np.mean(signal_list, axis=0)
 #%% ---------------------------------------------------------------------------------------------------------------------
 #%% pick and plot 10 frames
 
@@ -144,7 +146,7 @@ for i, ax in zip(range(10), axs.ravel()):
 #%% isolate just the signal 
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
-x_mask = (x >= 8000) & (x <= 63900) # isloate the roi, the ramp function
+x_mask = (x >= 39000) & (x <= 110000) # isloate the roi, the ramp function
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
 sigMasked = signal[x_mask] # isolate the signal 

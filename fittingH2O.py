@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-TDLAS FITTING FOR TEMPERATURE AND MOLE FRACTION OF CO2
+TDLAS FITTING FOR TEMPERATURE AND MOLE FRACTION OF H2O
 
 Created on Wed Aug 12 16:12:21 2026
 
@@ -10,13 +10,14 @@ aug12: establish fitting routine based on data reading code
 
 """
 # CHANGE THIS TO HOW MANY SAMPLES YOU TAKE !!!!
-shotCount = 500 
+shotCount = 100 
 
 # CHANGE THIS TO THE FOLDER LOCATION
-folderName = "C:\\Users\\ezb0082\\Downloads\\phi_1_height_ (5)"
+folderName = "C:\\Users\\ezb0082\\Downloads\\CO2_38degC_800kHz_120mA"
+
 # This can be changed to better guess T and X
-T = 700 # k
-X = 0.005 # CO2 mole fraction guess
+T = 550 # k
+X = 0.00525 # H2O mole fraction guess
 
 # change this to your experimental path length
 length = 2.54 # centimeters
@@ -59,7 +60,7 @@ def objective(arguments, A_exp_wlc):
     T = arguments[0] # pull t from the input array
     X = arguments[1] # pull t from the input array
     
-    wl, A_sim = hapi_calculation('CO2', P, T, X, length, resltn, afwing, wnb, dnu) # run Hcl calc for current condition
+    wl, A_sim = hapi_calculation('H2O', P, T, X, length, resltn, afwing, wnb, dnu) # run Hcl calc for current condition
 
     A_sim_c = np.interp(wlc, np.flip(wl), np.flip(A_sim)) # interpolate to common wavelength scale`
 
@@ -139,7 +140,7 @@ def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
 signal_list = []
 
 for frame in range(1,shotCount+1):
-    fName = "phi_1_height_ (5)_{frame:03d}.mat".format(frame=frame)
+    fName = "CO2_38degC_800kHz_120mA_{frame:03d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
     dat = loadmat(fPath)
     datSignal = dat["A"]
@@ -200,14 +201,14 @@ total_pathLength = length * passes  # cm
 resltn = 0.0001 # cm-1
 afwing = resltn * 5  # instrument function width
 
-wnb = [2381, 2382]
+wnb = [7179, 7182]
 dnu = 0.000001 
 
 P = 1
 
 # wlc = np.arange(2380.95, 2382.5, 0.001)
 
-wl, absorp_sim = hapi_calculation('CO2', P, T, X, length, resltn, afwing, wnb, dnu) # calculate absorp. for CEA values
+wl, absorp_sim = hapi_calculation('H2O', P, T, X, length, resltn, afwing, wnb, dnu) # calculate absorp. for CEA values
     
 # A_sim_wlc = np.interp(wlc, np.flip(wl), np.flip(absorp_sim))
 
@@ -219,24 +220,23 @@ wl, absorp_sim = hapi_calculation('CO2', P, T, X, length, resltn, afwing, wnb, d
 # A_exp_wlc = np.interp(wlc, wl_axis_fit, absorption_C) 
 
 #%% Fitting 
-# bnds = Bounds([200, 0.01], # lower bounds
-#               [4000, 1]) # upper bounds
+bnds = Bounds([200, 0.01], # lower bounds
+              [4000, 1]) # upper bounds
     
-# initial_guess = [T, X ] # initial guess t=290K, p=1atm, x=0.3, l = 5 (given cell values)
+initial_guess = [T, X ] # initial guess t=290K, p=1atm, x=0.3, l = 5 (given cell values)
 
-# # result = minimize(objective, initial_guess, bounds=bnds, tol=1e-4, method='Nelder-Mead', args=(A_exp_wlc)) # run minimizing routine
+# result = minimize(objective, initial_guess, bounds=bnds, tol=1e-4, method='Nelder-Mead', args=(A_exp_wlc)) # run minimizing routine
 
-# # print(result) # print minimizing routine results
+# print(result) # print minimizing routine results
 
-# T_fit =  T# result.x[0] # read result for T
-# X_fit = X# result.x[1] # read result for P
+T_fit =  T# result.x[0] # read result for T
+X_fit = X# result.x[1] # read result for P
 
-# wl_min, A_minimized = hapi_calculation('CO2', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at minimized T,P,X,and L
+# wl_min, A_minimized = hapi_calculation('H2O', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at minimized T,P,X,and L
 
 # A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
-nu = 1e7/ wl
 plt.figure()
-plt.plot(nu, absorp_sim) #, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
+plt.plot(wl, absorp_sim) #, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
 # plt.plot(wlc, A_exp_wlc , label='Exp.')
 plt.legend()
 
