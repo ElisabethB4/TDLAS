@@ -15,7 +15,7 @@ PICKING LATEST FILE ONLY WORKS FOR .SIG!!!!!
 shotCount = 500 # CHANGE THIS TO HOW MANY SHOTS YOU TAKE !!!!
 
 # CHANGE THIS TO THE FOLDER LOCATION
-folderName = "C:\\Users\\ezb0082\\Downloads\\phi_1_height_ (5)"
+folderName = "C:\\Users\\ezb0082\\Downloads\\phi_1.43_height_"
 
 #%% packages
 import os 
@@ -112,7 +112,7 @@ from scipy.io import loadmat
 signal_list = []
 
 for frame in range(1,shotCount+1):
-    fName = "phi_1_height_ (5)_{frame:03d}.mat".format(frame=frame)
+    fName = "phi_1.43_height__{frame:03d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
     dat = loadmat(fPath)
     datSignal = dat["A"]
@@ -146,14 +146,13 @@ for i, ax in zip(range(10), axs.ravel()):
 #%% isolate just the signal 
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
-x_mask = (x >= 39000) & (x <= 110000) # isloate the roi, the ramp function
+x_mask = (x >= 35000) & (x <= 105000) # isloate the roi
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
 sigMasked = signal[x_mask] # isolate the signal 
-
 #%% remove the background
 
-bg_fit_mask = ((x_narrow <= 31000) | (x_narrow >= 44500)) # implement mast  
+bg_fit_mask = ((x_narrow <= 69000) | (x_narrow >= 87400)) # implement mask
 # CO CELL FEATURE MASK: ((x_narrow <= 31000) | (x_narrow >= 44500)) 
 # HENCKEN BURNER CO FEATURE: ((x_narrow <= 33750) | (x_narrow >= 44500)) 
 
@@ -161,9 +160,11 @@ baseline_fitter = Baseline(x_data=x_narrow) # init baseline fitter
 fit, params_2 = baseline_fitter.asls(sigMasked, lam=1e6, p=0.001) # fit asls baseline to data
 fitted_BG = np.interp(x_narrow, x_narrow[bg_fit_mask], fit[bg_fit_mask]) # apply mask to fit line and interp back to regular xaxis
 
+poly = np.polyfit(sigMasked, x_narrow, deg=1)
+fit = np.polyval(poly, x_narrow)
 #%% plot raw, isolated, and bg fitting 
 
-fig, axs = plt.subplots(1, 3, sharey=True, figsize=[10,6]) # initialize figure
+fig, axs = plt.subplots(1, 3, sharey=False, figsize=[10,6]) # initialize figure
 fig.supylabel("Voltage")
 fig.supxlabel("Nanoseconds")
 
@@ -174,13 +175,13 @@ axs[1].plot(x_narrow, sigMasked) # plot masked data
 axs[1].title.set_text('Isolated Signal')
 
 axs[2].plot(x_narrow, sigMasked, label='Signal') # plot the isolated signal
-axs[2].plot(x_narrow, fitted_BG, label="Background") # plot the fited backgroiund 
+axs[2].plot(x_narrow, fit, label="Background") # plot the fited backgroiund 
 axs[2].title.set_text('Background Fitting')
 axs[2].legend()
 
 #%% transmission and absorption 
 
-transmission = sigMasked / fitted_BG # transmission I / Io 
+transmission = sigMasked / fit # transmission I / Io 
 
 absorption = 1 - transmission # absortion 1- transmission
 
@@ -190,5 +191,6 @@ axs[0].title.set_text('Transmission')
 
 axs[1].plot(absorption)
 axs[1].title.set_text('Absorption')
+
 
 plt.show()

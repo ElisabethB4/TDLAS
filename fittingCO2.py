@@ -159,7 +159,7 @@ sigMasked = signal[x_mask] # isolate the signal
 
 #%% pick the background
 
-bg_fit_mask = ((x_narrow <= 33750) | (x_narrow >= 44500)) # implement mask
+bg_fit_mask = ((x_narrow <= 65000) | (x_narrow >= 90000)) # implement mask
 # CO CELL FEATURE MASK: ((x_narrow <= 31000) | (x_narrow >= 44500)) 
 # HENCKEN BURNER CO FEATURE: ((x_narrow <= 33750) | (x_narrow >= 44500)) 
 
