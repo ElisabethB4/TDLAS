@@ -10,11 +10,10 @@ aug12: establish fitting routine based on data reading code
 
 """
 # CHANGE THIS TO HOW MANY SAMPLES YOU TAKE !!!!
-shotCount = 500 
+shotCount = 100 
 
 # CHANGE THIS TO THE FOLDER LOCATION
-folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.07.16\\CO Hencken Burner\\test folder" 
-
+folderName = "C:\\Users\\elisa\\Downloads\\CO2_38degC_800kHz_120mA"
 # This can be changed to better guess T and X
 T = 2000 # k
 X = 0.1 # CO mole fraction
@@ -33,6 +32,7 @@ from scipy.optimize import minimize, Bounds
 from pybaselines import Baseline
 from pathlib import Path
 from scipy.signal import find_peaks
+from scipy.io import loadmat
 #%% functions
 
 def hapi_calculation(species,p, t, x, length, resltn, afwing, wnb, dnu):
@@ -59,7 +59,7 @@ def objective(arguments, A_exp_wlc):
     T = arguments[0] # pull t from the input array
     X = arguments[1] # pull t from the input array
     
-    wl, A_sim = hapi_calculation('CO', P, T, X, length, resltn, afwing, wnb, dnu) # run Hcl calc for current condition
+    wl, A_sim = hapi_calculation('CO2', P, T, X, length, resltn, afwing, wnb, dnu) # run Hcl calc for current condition
 
     A_sim_c = np.interp(wlc, np.flip(wl), np.flip(A_sim)) # interpolate to common wavelength scale`
 
@@ -79,27 +79,27 @@ def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
     return residualrmse
 #%% ------------------------------------------------------------------------------------------------------------------
 #%% pick latest SIG file in folder CHANGE FOLDERNAME TO location !!!
-most_recent_file = None # initiallize
-most_recent_time = 0  # initialize
+# most_recent_file = None # initiallize
+# most_recent_time = 0  # initialize
 
-for entry in os.scandir(folderName): # loop through folder
-    if entry.is_file(): # check file
-        mod_time = entry.stat().st_mtime_ns # ch3eck time
-        if mod_time > most_recent_time: # compare tiems
-            most_recent_file = entry.name # update file name
-            most_recent_time = mod_time # update newest time
+# for entry in os.scandir(folderName): # loop through folder
+#     if entry.is_file(): # check file
+#         mod_time = entry.stat().st_mtime_ns # ch3eck time
+#         if mod_time > most_recent_time: # compare tiems
+#             most_recent_file = entry.name # update file name
+#             most_recent_time = mod_time # update newest time
         
-fullPath = Path(folderName, most_recent_file) # combine path
-dat = np.memmap(fullPath, np.int16, 'r') # read data
-header = dat[0:256] # isolate header
+# fullPath = Path(folderName, most_recent_file) # combine path
+# dat = np.memmap(fullPath, np.int16, 'r') # read data
+# header = dat[0:256] # isolate header
 
-resolution = abs(int(header[150])) ## this is the factor to convert to volts !! 
+# resolution = abs(int(header[150])) ## this is the factor to convert to volts !! 
 
-realData = dat[256:len(dat)] / resolution # get real data 
+# realData = dat[256:len(dat)] / resolution # get real data 
 
-signal_list = np.reshape(realData, (shotCount, -1)) # reshape array, unstack all shots from being vertically stacked
+# signal_list = np.reshape(realData, (shotCount, -1)) # reshape array, unstack all shots from being vertically stacked
 
-signal = np.mean(signal_list, axis=0) # take average of all shots
+# signal = np.mean(signal_list, axis=0) # take average of all shots
 
 #%% Read data as txt PRECONVERTED FROM GAGE .SIG FILE 
 
@@ -135,8 +135,16 @@ signal = np.mean(signal_list, axis=0) # take average of all shots
 # dat = np.loadtxt(f, skiprows=13)
 # signal_list = np.reshape(dat, (shotCount, -1))
 # signal = np.mean(signal_list, axis=0)
-
-
+#%% Read data from .mat 
+signal_list = []
+folderName = "C:\\Users\\elisa\\Downloads\\CO2_38degC_800kHz_120mA"
+for frame in range(1,shotCount+1):
+    fName = "CO2_38degC_800kHz_120mA_{frame:03d}.mat".format(frame=frame)
+    fPath = Path(folderName, fName)
+    dat = loadmat(fPath)
+    signal_list.append(dat)
+signal_list = np.array(signal_list)
+signal = np.mean(signal_list, axis=0)
 #%% ---------------------------------------------------------------------------------------------------------------------
 #%% isolate just the signal 
 
