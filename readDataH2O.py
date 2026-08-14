@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
 """ 
-CO TDLAS NO FITTING JUST FOR PLOTTING ON THE FLY 
+H2O TDLAS NO FITTING JUST FOR PLOTTING ON THE FLY 
 
 Created on Tue Aug 11 14:36:13 2026
 
 @author: ezb0082
 
-aug11: establish file reading, signal isolating, etcetc
-aug12: read asc file, pick latest sig file, fix shot count input, resoltion to conv to volts within sig
-
 PICKING LATEST FILE ONLY WORKS FOR .SIG!!!!! 
 
 """
-shotCount = 500 # CHANGE THIS TO HOW MANY SHOTS YOU TAKE !!!!
+shotCount = 1300 # CHANGE THIS TO HOW MANY SHOTS YOU TAKE !!!!
 
 # CHANGE THIS TO THE FOLDER LOCATION
 folderName = "E:\\Elisabeth\\tdlas\\2026.8.14"
@@ -111,12 +108,12 @@ from scipy.signal import find_peaks
 
 #%% Read data from .mat 
 signal_list = []
-folderName = "E:\\Elisabeth\\tdlas\\2026.8.14"
+
 for frame in range(1,shotCount+1):
     fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
     dat = loadmat(fPath)
-    datSignal = dat["A"]
+    datSignal = dat["D"]
     datReduced = datSignal[:,0]
     signal_list.append(datReduced)
 signal_list = np.array(signal_list)
@@ -128,11 +125,12 @@ for frame in range(1,500+1):
     fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
     bgdat = loadmat(fPath)
-    bgdatSignal = bgdat["A"]
+    bgdatSignal = bgdat["D"]
     bgdatReduced = bgdatSignal[:,0]
     bg_list.append(bgdatReduced)
 bg_list = np.array(bg_list)
 bg = np.mean(bg_list, axis=0)
+
 
 #%% ---------------------------------------------------------------------------------------------------------------------
 #%% pick and plot 10 frames
@@ -180,7 +178,7 @@ bg_masked = bg_norm[x_mask]
 fig, axs = plt.subplots(1, 2, sharey=True, figsize=[10,6]) # initialize figure
 fig.supylabel("Voltage")
 fig.supxlabel("Nanoseconds")
-fig.suptitle("CO, Averaged {:.0f} Shots".format(shotCount))
+fig.suptitle("CO2, Averaged {:.0f} Shots".format(shotCount))
 
 axs[0].plot( signal_norm) # plot raw data
 axs[0].plot(bg_norm)
@@ -203,80 +201,5 @@ axs[0].title.set_text('Transmission')
 axs[1].plot(absorption)
 axs[1].title.set_text('Absorption')
 
+
 plt.show()
-
-#%% ---------------------------------------------------------------------------------------------------------------------
-# #%% pick and plot 10 frames
-
-# fig, axs = plt.subplots(5, 2, sharex=True, figsize=[10,6]) # initialize figure
-# fig.supylabel("Voltage")  
-# fig.supxlabel("Nanoseconds")
-# plt.subplots_adjust(hspace=0.5) # space subplots apart
-
-# randShot = [] # allcoate stroage
-# for i in range(10): 
-#     randNumber = randint(1,500) # pick random frame
-#     randShot.append(randNumber) # append to array
-# randShot = np.array(randShot)     # make array
-
-# randShot.sort() # put random picks in order
-
-# for i, ax in zip(range(10), axs.ravel()):
-#     shotNumber = randShot[i] # pull shot number
-#     randSignal = signal_list[shotNumber,:] # pull shot data
-    
-#     ax.plot(randSignal) # plot this signal
-#     ax.title.set_text('Shot {:}'.format(str(shotNumber))) # plot title
-
-# #%% isolate just the signal 
-
-# x = np.arange(0, len(signal), 1) # create time arrays for x axis 
-
-# endRamp = find_peaks(signal, height= 0.1, distance = 50)
-# endRamp = endRamp[0]
-# x_mask = (x >= 2570) & (x <= endRamp[-1]) # isloate the roi, the ramp function
-# x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
-
-# sigMasked = signal[x_mask] # isolate the signal 
-
-# #%% remove the background
-
-# bg_fit_mask = ((x_narrow <= 34000) | (x_narrow >= 44500)) # implement mast  
-# # CO CELL FEATURE MASK: ((x_narrow <= 31000) | (x_narrow >= 44500)) 
-# # HENCKEN BURNER CO FEATURE: ((x_narrow <= 34000) | (x_narrow >= 44500)) 
-
-# baseline_fitter = Baseline(x_data=x_narrow) # init baseline fitter
-# fit, params_2 = baseline_fitter.asls(sigMasked, lam=1e6, p=0.001) # fit asls baseline to data
-# fitted_BG = np.interp(x_narrow, x_narrow[bg_fit_mask], fit[bg_fit_mask]) # apply mask to fit line and interp back to regular xaxis
-
-# #%% plot raw, isolated, and bg fitting 
-
-# fig, axs = plt.subplots(1, 3, sharey=True, figsize=[10,6]) # initialize figure
-# fig.supylabel("Voltage")
-# fig.supxlabel("Nanoseconds")
-
-# axs[0].plot(x, signal) # plot raw data
-# axs[0].title.set_text('Raw Data')
-
-# axs[1].plot(x_narrow, sigMasked) # plot masked data
-# axs[1].title.set_text('Isolated Signal')
-
-# axs[2].plot(x_narrow, sigMasked, label='Signal') # plot the isolated signal
-# axs[2].plot(x_narrow, fitted_BG, label="Background") # plot the fited backgroiund 
-# axs[2].title.set_text('Background Fitting')
-# axs[2].legend()
-
-# #%% transmission and absorption 
-
-# transmission = sigMasked / fitted_BG # transmission I / Io 
-
-# absorption = 1 - transmission # absortion 1- transmission
-
-# fig, axs = plt.subplots(1, 2, figsize=[10,6])
-# axs[0].plot(transmission)
-# axs[0].title.set_text('Transmission')
-
-# axs[1].plot(absorption)
-# axs[1].title.set_text('Absorption')
-
-# plt.show()

@@ -12,20 +12,20 @@ aug12: read asc file, pick latest sig file, fix shot count input, resoltion to c
 PICKING LATEST FILE ONLY WORKS FOR .SIG!!!!! 
 
 """
-shotCount = 500 # CHANGE THIS TO HOW MANY SHOTS YOU TAKE !!!!
+shotCount = 1300 # CHANGE THIS TO HOW MANY SHOTS YOU TAKE !!!!
 
 # CHANGE THIS TO THE FOLDER LOCATION
-folderName = "C:\\Users\\ezb0082\\Downloads\\phi_1.43_height_"
+folderName = "E:\\Elisabeth\\tdlas\\2026.8.14"
 
 #%% packages
 import os 
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pybaselines import Baseline
 from pathlib import Path
 from random import randint
 from scipy.io import loadmat
+from scipy.signal import find_peaks
 #%% ----------------------------------------------------------------------------------------------------------------------
 #%% pick latest SIG file in folder CHANGE FOLDERNAME TO location !!!
 # most_recent_file = None # initiallize
@@ -62,26 +62,6 @@ from scipy.io import loadmat
 # signal_list = np.array(signal_list) # append to array
 
 # signal = np.mean(signal_list, axis=0) # calc mean of all frames
-#%% Read data as txt PRECONVERTED FROM GAGE .SIG FILE 
-# start = time.time()
-# folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.07.16\\CO Hencken Burner\\Ramp\\CO Cell"
-
-# signal_list = [] # allocate storage
-# for frame in range(1,shotCount+1):
-#     fName = "CO_42.75degC_height_5mm_1kHz_ramp_COcell_Record{frame:03d}.txt".format(frame=frame) # data file names
-#     fPath = Path(folderName, fName) # combine path
-#     rawData = np.genfromtxt(fPath, skip_header=13) # read data
-#     signal_list.append(rawData) # append to d1ata list
-# signal_list = np.array(signal_list) # append to array
-
-# signal = np.mean(signal_list, axis=0) # calc mean of all 500 frames
-# end = time.time()
-
-# elapsed = end - start
-
-# print(elapsed)
-
-# plt.plot(signal)
 
 #%% read data from .sig SPECIFIED
 
@@ -112,21 +92,35 @@ from scipy.io import loadmat
 signal_list = []
 
 for frame in range(1,shotCount+1):
-    fName = "phi_1.43_height__{frame:03d}.mat".format(frame=frame)
+    fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
     dat = loadmat(fPath)
-    datSignal = dat["A"]
+    datSignal = dat["C"]
     datReduced = datSignal[:,0]
     signal_list.append(datReduced)
 signal_list = np.array(signal_list)
 signal = np.mean(signal_list, axis=0)
+
+bg_list = []
+folderName = "E:\\Elisabeth\\tdlas\\2026.8.14-wo_flame"
+for frame in range(1,500+1):
+    fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
+    fPath = Path(folderName, fName)
+    bgdat = loadmat(fPath)
+    bgdatSignal = bgdat["C"]
+    bgdatReduced = bgdatSignal[:,0]
+    bg_list.append(bgdatReduced)
+bg_list = np.array(bg_list)
+bg = np.mean(bg_list, axis = 0)
+
 #%% ---------------------------------------------------------------------------------------------------------------------
 #%% pick and plot 10 frames
 
-fig, axs = plt.subplots(5, 2, sharex=True, figsize=[10,6]) # initialize figure
+fig, axs = plt.subplots(5, 2, sharex=True, sharey=True, figsize=[10,6]) # initialize figure
 fig.supylabel("Voltage")  
 fig.supxlabel("Nanoseconds")
 plt.subplots_adjust(hspace=0.5) # space subplots apart
+fig.suptitle("10 Co2 Samples")
 
 randShot = [] # allcoate stroage
 for i in range(10): 
@@ -144,44 +138,41 @@ for i, ax in zip(range(10), axs.ravel()):
     ax.title.set_text('Shot {:}'.format(str(shotNumber))) # plot title
 
 #%% isolate just the signal 
+signal = signal - signal[0] # make starting pt ze4ro
+bg = bg - bg[0] # make starting point zero 
+
+signal_norm = signal / np.sum(signal) # normalize signal
+bg_norm =bg / np.sum(bg) # normalize bg
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
-x_mask = (x >= 35000) & (x <= 105000) # isloate the roi
+
+endRamp = find_peaks(signal, height= 0.1, distance = 50)
+endRamp = endRamp[0]
+x_mask = (x >= 2570) & (x <= endRamp[-1]) # isloate the roi
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
-sigMasked = signal[x_mask] # isolate the signal 
-#%% remove the background
+sigMasked = signal_norm[x_mask] # isolate the signal 
+bg_masked = bg_norm[x_mask]
+# sigMasked = sigMasked / np.mean(sigMasked)
 
-bg_fit_mask = ((x_narrow <= 69000) | (x_narrow >= 87400)) # implement mask
-# CO CELL FEATURE MASK: ((x_narrow <= 31000) | (x_narrow >= 44500)) 
-# HENCKEN BURNER CO FEATURE: ((x_narrow <= 33750) | (x_narrow >= 44500)) 
+#%% plot raw, isolated,
 
-baseline_fitter = Baseline(x_data=x_narrow) # init baseline fitter
-fit, params_2 = baseline_fitter.asls(sigMasked, lam=1e6, p=0.001) # fit asls baseline to data
-fitted_BG = np.interp(x_narrow, x_narrow[bg_fit_mask], fit[bg_fit_mask]) # apply mask to fit line and interp back to regular xaxis
-
-poly = np.polyfit(sigMasked, x_narrow, deg=1)
-fit = np.polyval(poly, x_narrow)
-#%% plot raw, isolated, and bg fitting 
-
-fig, axs = plt.subplots(1, 3, sharey=False, figsize=[10,6]) # initialize figure
+fig, axs = plt.subplots(1, 2, sharey=True, figsize=[10,6]) # initialize figure
 fig.supylabel("Voltage")
 fig.supxlabel("Nanoseconds")
+fig.suptitle("CO2, Averaged {:.0f} Shots".format(shotCount))
 
-axs[0].plot(x, signal) # plot raw data
+axs[0].plot( signal_norm) # plot raw data
+axs[0].plot(bg_norm)
 axs[0].title.set_text('Raw Data')
 
-axs[1].plot(x_narrow, sigMasked) # plot masked data
+axs[1].plot(sigMasked) # plot masked data
+axs[1].plot(bg_masked)
 axs[1].title.set_text('Isolated Signal')
-
-axs[2].plot(x_narrow, sigMasked, label='Signal') # plot the isolated signal
-axs[2].plot(x_narrow, fit, label="Background") # plot the fited backgroiund 
-axs[2].title.set_text('Background Fitting')
-axs[2].legend()
 
 #%% transmission and absorption 
 
-transmission = sigMasked / fit # transmission I / Io 
+transmission = sigMasked / bg_masked # transmission I / Io 
 
 absorption = 1 - transmission # absortion 1- transmission
 
