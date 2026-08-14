@@ -147,14 +147,17 @@ for i in range(len(randShot)):
 signal = signal - signal[0] # make starting pt ze4ro
 bg = bg - bg[0] # make starting point zero 
 
-signal_norm = signal / np.sum(signal) # normalize signal
-bg_norm =bg / np.sum(bg) # normalize bg
+signal_norm = signal.flatten() / np.max(signal) # normalize signal
+bg_norm = bg.flatten() / np.max(bg) # normalize bg
+# bg_norm = bg_norm * 1.1
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
 
 endRamp = find_peaks(signal, height= 0.1, distance = 50)
 endRamp = endRamp[0]
-x_mask = (x >= 2570) & (x <= endRamp[-1]) # isloate the roi
+# x_mask = (x >= 2570) & (x <= endRamp[-1]) # isloate the roi
+x_mask = (x >= 2750) & (x <= 4750) # endRamp[-1]) # isloate the roi OF THE FEATURE WE WANT 
+
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
 sigMasked = signal_norm[x_mask] # isolate the signal 

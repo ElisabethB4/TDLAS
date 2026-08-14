@@ -13,7 +13,7 @@ aug12: establish fitting routine based on data reading code
 shotCount = 500 
 
 # CHANGE THIS TO THE FOLDER LOCATION
-folderName = "C:\\Users\\ezb0082\\Downloads\\phi_1_height_ (5)"
+folderName = "E:\\Elisabeth\\tdlas\\2026.8.14"
 # This can be changed to better guess T and X
 T = 700 # k
 X = 0.005 # CO2 mole fraction guess
@@ -139,60 +139,77 @@ def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
 signal_list = []
 
 for frame in range(1,shotCount+1):
-    fName = "phi_1_height_ (5)_{frame:03d}.mat".format(frame=frame)
+    fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
     dat = loadmat(fPath)
-    datSignal = dat["A"]
-    sig_reduced = datSignal[:,0]
-    signal_list.append(sig_reduced)
+    datSignal = dat["C"]
+    datReduced = datSignal[:,0]
+    signal_list.append(datReduced)
 signal_list = np.array(signal_list)
 signal = np.mean(signal_list, axis=0)
 
+bg_list = []
+folderName = "E:\\Elisabeth\\tdlas\\2026.8.14-wo_flame"
+for frame in range(1,500+1):
+    fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
+    fPath = Path(folderName, fName)
+    bgdat = loadmat(fPath)
+    bgdatSignal = bgdat["C"]
+    bgdatReduced = bgdatSignal[:,0]
+    bg_list.append(bgdatReduced)
+bg_list = np.array(bg_list)
+bg = np.mean(bg_list, axis = 0)
+
 #%% ---------------------------------------------------------------------------------------------------------------------
 #%% isolate just the signal 
+signal = signal - signal[0] # make starting pt ze4ro
+bg = bg - bg[0] # make starting point zero 
+
+signal_norm = signal / np.sum(signal) # normalize signal
+bg_norm =bg / np.sum(bg) # normalize bg
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
-x_mask = (x >= 8500) & (x <= 63900) # isloate the roi, the ramp function
+
+endRamp = find_peaks(signal, height= 0.1, distance = 50)
+endRamp = endRamp[0]
+x_mask = (x >= 2600) & (x <= 4750) # endRamp[-1]) # isloate the roi OF THE FEATURE WE WANT 
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
-sigMasked = signal[x_mask] # isolate the signal 
+sigMasked = signal_norm[x_mask] # isolate the signal 
+bg_masked = bg_norm[x_mask]
+# sigMasked = sigMasked / np.mean(sigMasked)
+#%% transmission and absorption 
 
-#%% pick the background
-
-bg_fit_mask = ((x_narrow <= 65000) | (x_narrow >= 90000)) # implement mask
-# CO CELL FEATURE MASK: ((x_narrow <= 31000) | (x_narrow >= 44500)) 
-# HENCKEN BURNER CO FEATURE: ((x_narrow <= 33750) | (x_narrow >= 44500)) 
-
-baseline_fitter = Baseline(x_data=x_narrow) # init baseline fitter
-fit, params_2 = baseline_fitter.asls(sigMasked, lam=1e6, p=0.001) # fit asls baseline to data
-fitted_BG = np.interp(x_narrow, x_narrow[bg_fit_mask], fit[bg_fit_mask]) # apply mask to fit line and interp back to regular xaxis
-
-#%% calculate absorption using the fitted background
-
-transmission = sigMasked / fitted_BG # transmission I / Io 
+transmission = sigMasked / bg_masked # transmission I / Io 
 
 absorption = 1 - transmission # absortion 1- transmission
 
 fig, axs = plt.subplots(1, 2, figsize=[10,6])
+fig.supxlabel("Time (ns)")
+
 axs[0].plot(transmission)
 axs[0].title.set_text('Transmission')
 
 axs[1].plot(absorption)
 axs[1].title.set_text('Absorption')
 
+plt.show()
 #%% baseline correct 
+baseline_fitter = Baseline(x_data=x_narrow)
+line, params_2 = baseline_fitter.drpls(absorption, lam=1e6)
 
-deg = 1
-poly = np.polyfit(x_narrow[bg_fit_mask], absorption[bg_fit_mask], deg)
-bkg = np.polyval(poly, x_narrow)
+absorption_C = absorption - line
 
-absorption_C = absorption - bkg 
-
+plt.figure()
+plt.plot(x_narrow, absorption)
+plt.plot(x_narrow, absorption_C)
+plt.plot(x_narrow, line)
+plt.axhline(0)
 #%% wl axis
 sort_idx = np.argsort(x_narrow)
 xs = x_narrow[sort_idx]
 
-# wavelength_exp = 2380.7 + 1.02 * (xs - xs.min()) / (xs.max() - xs.min()) 
+wavelength_exp = 4198.5 + 1.2 * (xs - xs.min()) / (xs.max() - xs.min()) 
 
 hp.db_begin('HAPI_DATA')
 
@@ -205,38 +222,43 @@ dnu = 0.000001
 
 P = 1
 
-# wlc = np.arange(2380.95, 2382.5, 0.001)
+wlc = np.arange(4198, 4200, 0.001)
 
 wl, absorp_sim = hapi_calculation('CO2', P, T, X, length, resltn, afwing, wnb, dnu) # calculate absorp. for CEA values
     
-# A_sim_wlc = np.interp(wlc, np.flip(wl), np.flip(absorp_sim))
+A_sim_wlc = np.interp(wlc, np.flip(wl), np.flip(absorp_sim))
 
 # bnds = Bounds([-1e6], [1e6])
 # init = [1e-3]
 # wl_fit_result = minimize(wl_axis_cal, init, bounds=bnds, tol= 1e-6, method='Nelder-Mead', args=(wavelength_exp, wlc, A_sim_wlc, absorption_C))
 # wl_axis_fit =  wavelength_exp + wl_fit_result.x[0]
 
-# A_exp_wlc = np.interp(wlc, wl_axis_fit, absorption_C) 
+A_exp_wlc = np.interp(wlc, wavelength_exp, absorption_C) 
 
-#%% Fitting 
-# bnds = Bounds([200, 0.01], # lower bounds
-#               [4000, 1]) # upper bounds
-    
-# initial_guess = [T, X ] # initial guess t=290K, p=1atm, x=0.3, l = 5 (given cell values)
-
-# # result = minimize(objective, initial_guess, bounds=bnds, tol=1e-4, method='Nelder-Mead', args=(A_exp_wlc)) # run minimizing routine
-
-# # print(result) # print minimizing routine results
-
-# T_fit =  T# result.x[0] # read result for T
-# X_fit = X# result.x[1] # read result for P
-
-# wl_min, A_minimized = hapi_calculation('CO2', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at minimized T,P,X,and L
-
-# A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
-nu = 1e7/ wl
 plt.figure()
-plt.plot(nu, absorp_sim) #, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
+plt.plot(wlc, A_sim_wlc) #, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
+plt.plot(wlc, A_exp_wlc , label='Exp.')
+plt.legend()
+
+plt.show()
+#%% Fitting 
+bnds = Bounds([200, 0.01], # lower bounds
+              [4000, 1]) # upper bounds
+    
+initial_guess = [T, X ] # initial guess t=290K, p=1atm, x=0.3, l = 5 (given cell values)
+
+result = minimize(objective, initial_guess, bounds=bnds, tol=1e-4, method='Nelder-Mead', args=(A_exp_wlc)) # run minimizing routine
+
+print(result) # print minimizing routine results
+
+T_fit =  T# result.x[0] # read result for T
+X_fit = X# result.x[1] # read result for P
+
+wl_min, A_minimized = hapi_calculation('CO2', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at minimized T,P,X,and L
+
+A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
+plt.figure()
+plt.plot(wl, absorp_sim) #, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
 # plt.plot(wlc, A_exp_wlc , label='Exp.')
 plt.legend()
 

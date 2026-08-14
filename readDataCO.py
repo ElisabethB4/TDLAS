@@ -167,8 +167,8 @@ for i in range(len(randShot)):
 signal = signal - signal[0] # make starting pt ze4ro
 bg = bg - bg[0] # make starting point zero 
 
-signal_norm = signal / np.sum(signal) # normalize signal
-bg_norm =bg / np.sum(bg) # normalize bg
+signal_norm = signal.flatten() / np.max(signal) # normalize signal
+bg_norm = bg.flatten() / np.max(bg) # normalize bg
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
 

@@ -32,6 +32,8 @@ import hapi as hp
 from scipy.optimize import minimize, Bounds
 from pybaselines import Baseline
 from pathlib import Path
+from scipy.io import loadmat
+from scipy.signal import find_peaks
 
 #%% functions
 
@@ -137,53 +139,99 @@ signal = np.mean(signal_list, axis=0) # take average of all shots
 # signal_list = np.reshape(dat, (shotCount, -1))
 # signal = np.mean(signal_list, axis=0)
 
+#%% Read data from .mat 
+signal_list = []
+folderName = "E:\\Elisabeth\\tdlas\\2026.8.14"
+for frame in range(1,shotCount+1):
+    fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
+    fPath = Path(folderName, fName)
+    dat = loadmat(fPath)
+    datSignal = dat["A"]
+    datReduced = datSignal[:,0]
+    signal_list.append(datReduced)
+signal_list = np.array(signal_list)
+signal = np.mean(signal_list, axis=0)
+
+bg_list = []
+folderName = "E:\\Elisabeth\\tdlas\\2026.8.14-wo_flame"
+for frame in range(1,500+1):
+    fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
+    fPath = Path(folderName, fName)
+    bgdat = loadmat(fPath)
+    bgdatSignal = bgdat["A"]
+    bgdatReduced = bgdatSignal[:,0]
+    bg_list.append(bgdatReduced)
+bg_list = np.array(bg_list)
+bg = np.mean(bg_list, axis=0)
 
 #%% ---------------------------------------------------------------------------------------------------------------------
-#%% isolate just the signal 
+#%% isolate signal 
+signal = signal - signal[0] # make starting pt ze4ro
+bg = bg - bg[0] # make starting point zero 
+
+signal_norm = signal.flatten() / np.max(signal) # normalize signal
+bg_norm = bg.flatten() / np.max(bg) # normalize bg
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
-x_mask = (x >= 8500) & (x <= 63900) # isloate the roi, the ramp function
+
+endRamp = find_peaks(signal, height= 0.1, distance = 50)
+endRamp = endRamp[0]
+x_mask = (x >= 2570) & (x <= endRamp[-1]) # isloate the roi
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
-sigMasked = signal[x_mask] # isolate the signal 
+sigMasked = signal_norm[x_mask] # isolate the signal 
+bg_masked = bg_norm[x_mask]
 
-#%% pick the background
+#%% transmission and absorption 
 
-bg_fit_mask = ((x_narrow <= 34500) | (x_narrow >= 44500))   # implement mask
-# CO CELL FEATURE MASK: ((x_narrow <= 31000) | (x_narrow >= 44500)) 
-# HENCKEN BURNER CO FEATURE: ((x_narrow <= 33750) | (x_narrow >= 44500)) 
-
-baseline_fitter = Baseline(x_data=x_narrow) # init baseline fitter
-fit, params_2 = baseline_fitter.asls(sigMasked, lam=1e6, p=0.001) # fit asls baseline to data
-fitted_BG = np.interp(x_narrow, x_narrow[bg_fit_mask], fit[bg_fit_mask]) # apply mask to fit line and interp back to regular xaxis
-
-#%% calculate absorption using the fitted background
-
-transmission = sigMasked / fitted_BG # transmission I / Io 
+transmission = sigMasked / bg_masked # transmission I / Io 
 
 absorption = 1 - transmission # absortion 1- transmission
 
 fig, axs = plt.subplots(1, 2, figsize=[10,6])
+fig.supxlabel("Time (ns)")
+
 axs[0].plot(transmission)
 axs[0].title.set_text('Transmission')
 
 axs[1].plot(absorption)
 axs[1].title.set_text('Absorption')
 
+plt.show()
+
+#%% denoise - CO ONY 
+def denoise(x, y):
+    baseline_fitter = Baseline(x_data=x)
+    line, params_2 = baseline_fitter.drpls(y, lam=1e6)
+    return line
+
+absorption_DN = denoise(x_narrow, absorption)
+
+# plt.figure()
+# plt.plot(x_narrow, absorption)
+# plt.plot(x_narrow, absorption_DN)
+
+absorption = absorption_DN
 #%% baseline correct 
 
-deg = 1
-poly = np.polyfit(x_narrow[bg_fit_mask], absorption[bg_fit_mask], deg)
+deg = 2
+poly = np.polyfit(x_narrow, absorption, deg)
 bkg = np.polyval(poly, x_narrow)
 
 absorption_C = absorption - bkg 
+
+# plt.figure()
+# plt.plot(x_narrow, absorption)
+# plt.plot(x_narrow, bkg)
+# plt.plot(x_narrow, absorption_C)
+# plt.show()
 
 #%% temperature and mole fraction fitting
 
 sort_idx = np.argsort(x_narrow) # sort the x axis 
 xs = x_narrow[sort_idx] 
 
-wavelength_exp = 2329.7 + 1.02 * (xs - xs.min()) / (xs.max() - xs.min()) # build wl axis initial gues
+wavelength_exp = 2329.7 + 0.95 * (xs - xs.min()) / (xs.max() - xs.min()) # build wl axis initial gues
 
 hp.db_begin('HAPI_DATA') # initialize hapi database
 
@@ -226,8 +274,8 @@ wl_min, A_minimized = hapi_calculation('CO', P, T_fit, X_fit, length, resltn, af
 A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
     
 plt.figure() # plot
-plt.plot(wlc, A_min_wlc, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
 plt.plot(wlc, A_exp_wlc , label='Exp.')
+plt.plot(wlc, A_min_wlc, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
 plt.legend()
 plt.title("Experimental and Fitted Spectra")
 plt.xlabel("Wavelength (nm)")
