@@ -131,14 +131,14 @@ for frame in range(1,500+1):
 bg_list = np.array(bg_list)
 bg = np.mean(bg_list, axis=0)
 
-
 #%% ---------------------------------------------------------------------------------------------------------------------
 #%% pick and plot 10 frames
 
 fig, axs = plt.subplots(5, 2, sharex=True, figsize=[10,6]) # initialize figure
 fig.supylabel("Voltage")  
-fig.supxlabel("Nanoseconds")
+fig.supxlabel("Time (ns)")
 plt.subplots_adjust(hspace=0.5) # space subplots apart
+fig.suptitle("10 H2O Samples")
 
 randShot = [] # allcoate stroage
 for i in range(10): 
@@ -155,6 +155,12 @@ for i, ax in zip(range(10), axs.ravel()):
     ax.plot(randSignal) # plot this signal
     ax.title.set_text('Shot {:}'.format(str(shotNumber))) # plot title
 
+plt.figure()
+plt.ylabel("Voltage")
+plt.xlabel("Time (ns)")
+plt.title("10 H2O Samples Overlaid")
+for i in range(len(randShot)):
+    plt.plot(signal_list[randShot[i],:])
 #%% isolate signal 
 signal = signal - signal[0] # make starting pt ze4ro
 bg = bg - bg[0] # make starting point zero 
@@ -164,28 +170,28 @@ bg_norm =bg / np.sum(bg) # normalize bg
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
 
-endRamp = find_peaks(signal, height= 0.1, distance = 50)
+endRamp = find_peaks(signal, height= 0.1, distance = 100)
 endRamp = endRamp[0]
-x_mask = (x >= 2570) & (x <= endRamp[-1]) # isloate the roi
+x_mask = (x >= 1000) & (x <= endRamp[-1]) # isloate the roi
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
 sigMasked = signal_norm[x_mask] # isolate the signal 
 bg_masked = bg_norm[x_mask]
 # sigMasked = sigMasked / np.mean(sigMasked)
 
-#%% plot raw & isolated
+#%% plot raw & isolated signal
 
 fig, axs = plt.subplots(1, 2, sharey=True, figsize=[10,6]) # initialize figure
-fig.supylabel("Voltage")
-fig.supxlabel("Nanoseconds")
+fig.supylabel("Normalized Signal")
+fig.supxlabel("Time (ns)")
 fig.suptitle("H2O, Averaged {:.0f} Shots".format(shotCount))
 
-axs[0].plot( signal_norm) # plot raw data
+axs[0].plot(signal_norm) # plot raw data
 axs[0].plot(bg_norm)
 axs[0].title.set_text('Raw Data')
 
-axs[1].plot(sigMasked) # plot masked data
-axs[1].plot(bg_masked)
+axs[1].plot(x_narrow, sigMasked) # plot masked data
+axs[1].plot(x_narrow, bg_masked)
 axs[1].title.set_text('Isolated Signal')
 
 #%% transmission and absorption 
@@ -195,11 +201,12 @@ transmission = sigMasked / bg_masked # transmission I / Io
 absorption = 1 - transmission # absortion 1- transmission
 
 fig, axs = plt.subplots(1, 2, figsize=[10,6])
+fig.supxlabel("Time (ns)")
+
 axs[0].plot(transmission)
 axs[0].title.set_text('Transmission')
 
 axs[1].plot(absorption)
 axs[1].title.set_text('Absorption')
-
 
 plt.show()
