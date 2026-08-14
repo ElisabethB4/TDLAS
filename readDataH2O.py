@@ -178,7 +178,7 @@ bg_masked = bg_norm[x_mask]
 fig, axs = plt.subplots(1, 2, sharey=True, figsize=[10,6]) # initialize figure
 fig.supylabel("Voltage")
 fig.supxlabel("Nanoseconds")
-fig.suptitle("CO2, Averaged {:.0f} Shots".format(shotCount))
+fig.suptitle("H2O, Averaged {:.0f} Shots".format(shotCount))
 
 axs[0].plot( signal_norm) # plot raw data
 axs[0].plot(bg_norm)
