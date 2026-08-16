@@ -10,10 +10,10 @@ aug12: establish fitting routine based on data reading code
 """ 
 
 # CHANGE THIS TO HOW MANY SAMPLES YOU TAKE !!!!
-shotCount = 500 
+shotCount = 1300 
 
-# CHANGE THIS TO THE FOLDER LOCATION
-folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.07.16\\CO Hencken Burner\\test folder" 
+# CHANGE THIS TO THE FOLDER LOCATION for picking latest .sig 
+# folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.07.16\\CO Hencken Burner\\test folder" 
 
 # This can be changed to better guess T and X
 T = 2000 # k
@@ -81,27 +81,27 @@ def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
     return residualrmse
 #%% ------------------------------------------------------------------------------------------------------------------
 #%% pick latest SIG file in folder CHANGE FOLDERNAME TO location !!!
-most_recent_file = None # initiallize
-most_recent_time = 0  # initialize
+# most_recent_file = None # initiallize
+# most_recent_time = 0  # initialize
 
-for entry in os.scandir(folderName): # loop through folder
-    if entry.is_file(): # check file
-        mod_time = entry.stat().st_mtime_ns # ch3eck time
-        if mod_time > most_recent_time: # compare tiems
-            most_recent_file = entry.name # update file name
-            most_recent_time = mod_time # update newest time
+# for entry in os.scandir(folderName): # loop through folder
+#     if entry.is_file(): # check file
+#         mod_time = entry.stat().st_mtime_ns # ch3eck time
+#         if mod_time > most_recent_time: # compare tiems
+#             most_recent_file = entry.name # update file name
+#             most_recent_time = mod_time # update newest time
         
-fullPath = Path(folderName, most_recent_file) # combine path
-dat = np.memmap(fullPath, np.int16, 'r') # read data
-header = dat[0:256] # isolate header
+# fullPath = Path(folderName, most_recent_file) # combine path
+# dat = np.memmap(fullPath, np.int16, 'r') # read data
+# header = dat[0:256] # isolate header
 
-resolution = abs(int(header[150])) ## this is the factor to convert to volts !! 
+# resolution = abs(int(header[150])) ## this is the factor to convert to volts !! 
 
-realData = dat[256:len(dat)] / resolution # get real data 
+# realData = dat[256:len(dat)] / resolution # get real data 
 
-signal_list = np.reshape(realData, (shotCount, -1)) # reshape array, unstack all shots from being vertically stacked
+# signal_list = np.reshape(realData, (shotCount, -1)) # reshape array, unstack all shots from being vertically stacked
 
-signal = np.mean(signal_list, axis=0) # take average of all shots
+# signal = np.mean(signal_list, axis=0) # take average of all shots
 
 #%% Read data as txt PRECONVERTED FROM GAGE .SIG FILE 
 
@@ -141,7 +141,7 @@ signal = np.mean(signal_list, axis=0) # take average of all shots
 
 #%% Read data from .mat 
 signal_list = []
-folderName = "E:\\Elisabeth\\tdlas\\2026.8.14"
+folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
 for frame in range(1,shotCount+1):
     fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -153,7 +153,7 @@ signal_list = np.array(signal_list)
 signal = np.mean(signal_list, axis=0)
 
 bg_list = []
-folderName = "E:\\Elisabeth\\tdlas\\2026.8.14-wo_flame"
+folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
 for frame in range(1,500+1):
     fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -214,24 +214,24 @@ absorption_DN = denoise(x_narrow, absorption)
 absorption = absorption_DN
 #%% baseline correct 
 
-deg = 2
+deg = 4
 poly = np.polyfit(x_narrow, absorption, deg)
 bkg = np.polyval(poly, x_narrow)
 
 absorption_C = absorption - bkg 
 
-# plt.figure()
-# plt.plot(x_narrow, absorption)
-# plt.plot(x_narrow, bkg)
-# plt.plot(x_narrow, absorption_C)
-# plt.show()
+plt.figure()
+plt.plot(x_narrow, absorption)
+plt.plot(x_narrow, bkg)
+plt.plot(x_narrow, absorption_C)
+plt.show()
 
 #%% temperature and mole fraction fitting
 
 sort_idx = np.argsort(x_narrow) # sort the x axis 
 xs = x_narrow[sort_idx] 
 
-wavelength_exp = 2329.7 + 0.95 * (xs - xs.min()) / (xs.max() - xs.min()) # build wl axis initial gues
+wavelength_exp = 2329.83 + 0.75 * (xs - xs.min()) / (xs.max() - xs.min()) # build wl axis initial gues
 
 hp.db_begin('HAPI_DATA') # initialize hapi database
 
