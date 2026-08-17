@@ -242,7 +242,7 @@ plt.legend()
 
 plt.show()
 #%% Fitting 
-bnds = Bounds([200, 0.01], # lower bounds
+bnds = Bounds([200, 0.001], # lower bounds
               [4000, 1]) # upper bounds
     
 initial_guess = [T, X ] # initial guess
@@ -251,10 +251,10 @@ result = minimize(objective, initial_guess, bounds=bnds, tol=1e-4, method='Nelde
 
 print(result) # print minimizing routine results
 
-T_fit =  T# result.x[0] # read result for T
-X_fit = X# result.x[1] # read result for P
+T_fit =  result.x[0] # read result for T
+X_fit = result.x[1] # read result for P
 
-wl_min, A_minimized = hapi_calculation('CO', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at fitted t and x
+wl_min, A_minimized = hapi_calculation('CO2', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at fitted t and x
 
 A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
     
