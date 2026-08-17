@@ -13,7 +13,7 @@ aug12: establish fitting routine based on data reading code
 shotCount = 100 
 
 # CHANGE THIS TO THE FOLDER LOCATION
-folderName = "C:\\Users\\ezb0082\\Downloads\\CO2_38degC_800kHz_120mA"
+# folderName = "C:\\Users\\ezb0082\\Downloads\\CO2_38degC_800kHz_120mA"
 
 # This can be changed to better guess T and X
 T = 550 # k
@@ -136,64 +136,73 @@ def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
 # dat = np.loadtxt(f, skiprows=13)
 # signal_list = np.reshape(dat, (shotCount, -1))
 # signal = np.mean(signal_list, axis=0)
+
 #%% Read data from .mat 
 signal_list = []
-
+folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
 for frame in range(1,shotCount+1):
-    fName = "CO2_38degC_800kHz_120mA_{frame:03d}.mat".format(frame=frame)
+    fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
     dat = loadmat(fPath)
-    datSignal = dat["A"]
-    sig_reduced = datSignal[:,0]
-    signal_list.append(sig_reduced)
+    datSignal = dat["D"]
+    datReduced = datSignal[:,0]
+    signal_list.append(datReduced)
 signal_list = np.array(signal_list)
 signal = np.mean(signal_list, axis=0)
 
+bg_list = []
+folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
+for frame in range(1,shotCount+1):
+    fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
+    fPath = Path(folderName, fName)
+    bgdat = loadmat(fPath)
+    bgdatSignal = bgdat["D"]
+    bgdatReduced = bgdatSignal[:,0]
+    bg_list.append(bgdatReduced)
+bg_list = np.array(bg_list)
+bg = np.mean(bg_list, axis=0)
+
 #%% ---------------------------------------------------------------------------------------------------------------------
-#%% isolate just the signal 
+signal = signal - signal[0] # make starting pt ze4ro
+bg = bg - bg[0] # make starting point zero 
+
+signal_norm = signal / np.sum(signal) # normalize signal
+bg_norm =bg / np.sum(bg) # normalize bg
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
-x_mask = (x >= 8500) & (x <= 63900) # isloate the roi, the ramp function
+
+endRamp = find_peaks(signal, height= 0.1, distance = 100)
+endRamp = endRamp[0]
+x_mask = (x >= 1000) & (x <= endRamp[-1]) # isloate the roi
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
-sigMasked = signal[x_mask] # isolate the signal 
+sigMasked = signal_norm[x_mask] # isolate the signal 
+bg_masked = bg_norm[x_mask]
+# sigMasked = sigMasked / np.mean(sigMasked)
 
-#%% pick the background
+#%% transmission and absorption 
 
-bg_fit_mask = ((x_narrow <= 33750) | (x_narrow >= 44500)) # implement mask
-# CO CELL FEATURE MASK: ((x_narrow <= 31000) | (x_narrow >= 44500)) 
-# HENCKEN BURNER CO FEATURE: ((x_narrow <= 33750) | (x_narrow >= 44500)) 
-
-baseline_fitter = Baseline(x_data=x_narrow) # init baseline fitter
-fit, params_2 = baseline_fitter.asls(sigMasked, lam=1e6, p=0.001) # fit asls baseline to data
-fitted_BG = np.interp(x_narrow, x_narrow[bg_fit_mask], fit[bg_fit_mask]) # apply mask to fit line and interp back to regular xaxis
-
-#%% calculate absorption using the fitted background
-
-transmission = sigMasked / fitted_BG # transmission I / Io 
+transmission = sigMasked / bg_masked # transmission I / Io 
 
 absorption = 1 - transmission # absortion 1- transmission
 
 fig, axs = plt.subplots(1, 2, figsize=[10,6])
+fig.supxlabel("Time (ns)")
+
 axs[0].plot(transmission)
 axs[0].title.set_text('Transmission')
 
 axs[1].plot(absorption)
 axs[1].title.set_text('Absorption')
 
-#%% baseline correct 
+plt.show()
 
-deg = 1
-poly = np.polyfit(x_narrow[bg_fit_mask], absorption[bg_fit_mask], deg)
-bkg = np.polyval(poly, x_narrow)
-
-absorption_C = absorption - bkg 
 
 #%% wl axis
 sort_idx = np.argsort(x_narrow)
 xs = x_narrow[sort_idx]
 
-# wavelength_exp = 2380.7 + 1.02 * (xs - xs.min()) / (xs.max() - xs.min()) 
+wavelength_exp = 2380.7 + 1.02 * (xs - xs.min()) / (xs.max() - xs.min()) 
 
 hp.db_begin('HAPI_DATA')
 
@@ -206,7 +215,7 @@ dnu = 0.000001
 
 P = 1
 
-# wlc = np.arange(2380.95, 2382.5, 0.001)
+wlc = np.arange(1392.36, 1392.95, 0.001)
 
 wl, absorp_sim = hapi_calculation('H2O', P, T, X, length, resltn, afwing, wnb, dnu) # calculate absorp. for CEA values
     
@@ -217,7 +226,7 @@ wl, absorp_sim = hapi_calculation('H2O', P, T, X, length, resltn, afwing, wnb, d
 # wl_fit_result = minimize(wl_axis_cal, init, bounds=bnds, tol= 1e-6, method='Nelder-Mead', args=(wavelength_exp, wlc, A_sim_wlc, absorption_C))
 # wl_axis_fit =  wavelength_exp + wl_fit_result.x[0]
 
-# A_exp_wlc = np.interp(wlc, wl_axis_fit, absorption_C) 
+A_exp_wlc = np.interp(wlc, wavelength_exp, absorption) 
 
 #%% Fitting 
 bnds = Bounds([200, 0.01], # lower bounds
@@ -237,7 +246,7 @@ X_fit = X# result.x[1] # read result for P
 # A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
 plt.figure()
 plt.plot(wl, absorp_sim) #, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
-# plt.plot(wlc, A_exp_wlc , label='Exp.')
+plt.plot(wlc, A_exp_wlc , label='Exp.')
 plt.legend()
 
 plt.show()
