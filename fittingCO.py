@@ -42,7 +42,7 @@ def hapi_calculation(species,p, t, x, length, resltn, afwing, wnb, dnu):
                                               WavenumberRange=(wnb),
                                               WavenumberStep=(dnu),
                                               Environment={'p':p, 'T':t}, 
-                                              Diluent={'Air':(1-x)},
+                                              Diluent={'Self':x, 'Air':(1-x)},
                                               HITRAN_units=False)   
             coef_corrected = coef * x  # scale coefficent by mole fraction
             nu, absorp = hp.absorptionSpectrum(nu,coef_corrected,  # calculate absorption from abs coeff                 
@@ -141,7 +141,7 @@ def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
 
 #%% Read data from .mat 
 signal_list = []
-folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
+folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
 for frame in range(1,shotCount+1):
     fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -153,7 +153,7 @@ signal_list = np.array(signal_list)
 signal = np.mean(signal_list, axis=0)
 
 bg_list = []
-folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
+folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
 for frame in range(1,500+1):
     fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -199,31 +199,24 @@ axs[1].title.set_text('Absorption')
 
 plt.show()
 
-#%% denoise - CO ONY 
-def denoise(x, y):
-    baseline_fitter = Baseline(x_data=x)
-    line, params_2 = baseline_fitter.drpls(y, lam=1e6)
-    return line
-
-absorption_DN = denoise(x_narrow, absorption)
-
-# plt.figure()
-# plt.plot(x_narrow, absorption)
-# plt.plot(x_narrow, absorption_DN)
-
-absorption = absorption_DN
 #%% baseline correct 
 
-deg = 4
+deg = 2
 poly = np.polyfit(x_narrow, absorption, deg)
 bkg = np.polyval(poly, x_narrow)
 
-absorption_C = absorption - bkg 
+absorption_C = absorption - bkg
+
+deg = 1 
+poly2 = np.polyfit(x_narrow[900:3000], absorption_C[900:3000], deg)
+bkg2 = np.polyval(poly2, x_narrow)
+absorption_C2 = absorption_C - bkg2
 
 plt.figure()
 plt.plot(x_narrow, absorption)
-plt.plot(x_narrow, bkg)
+plt.plot(x_narrow[900:3000], bkg2[900:3000])
 plt.plot(x_narrow, absorption_C)
+plt.plot(x_narrow, absorption_C2)
 plt.show()
 
 #%% temperature and mole fraction fitting
@@ -281,3 +274,5 @@ plt.title("Experimental and Fitted Spectra")
 plt.xlabel("Wavelength (nm)")
 plt.ylabel("Absorption")
 plt.show()
+
+# %%
