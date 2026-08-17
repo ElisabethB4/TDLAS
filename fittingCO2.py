@@ -40,7 +40,7 @@ def hapi_calculation(species,p, t, x, length, resltn, afwing, wnb, dnu):
                                               WavenumberRange=(wnb),
                                               WavenumberStep=(dnu),
                                               Environment={'p':p, 'T':t}, 
-                                              Diluent={'Air':(1-x)},
+                                              Diluent={'Self':x, 'Air':(1-x)},
                                               HITRAN_units=False)   
             coef_corrected = coef * x  # scale coefficent by mole fraction
             nu, absorp = hp.absorptionSpectrum(nu,coef_corrected,  # calculate absorption from abs coeff                 
@@ -137,8 +137,7 @@ def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
 # signal = np.mean(signal_list, axis=0)
 #%% Read data from .mat 
 signal_list = []
-folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
-
+folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
 for frame in range(1,shotCount+1):
     fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -150,7 +149,7 @@ signal_list = np.array(signal_list)
 signal = np.mean(signal_list, axis=0)
 
 bg_list = []
-folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
+folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
 for frame in range(1,500+1):
     fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -210,7 +209,7 @@ plt.axhline(0)
 sort_idx = np.argsort(x_narrow)
 xs = x_narrow[sort_idx]
 
-wavelength_exp = 4198.5 + 1.2 * (xs - xs.min()) / (xs.max() - xs.min()) 
+wavelength_exp = 4198.55 + 1.1 * (xs - xs.min()) / (xs.max() - xs.min()) 
 
 hp.db_begin('HAPI_DATA')
 
@@ -229,10 +228,10 @@ wl, absorp_sim = hapi_calculation('CO2', P, T, X, length, resltn, afwing, wnb, d
     
 A_sim_wlc = np.interp(wlc, np.flip(wl), np.flip(absorp_sim))
 
-# bnds = Bounds([-1e6], [1e6])
-# init = [1e-3]
-# wl_fit_result = minimize(wl_axis_cal, init, bounds=bnds, tol= 1e-6, method='Nelder-Mead', args=(wavelength_exp, wlc, A_sim_wlc, absorption_C))
-# wl_axis_fit =  wavelength_exp + wl_fit_result.x[0]
+bnds = Bounds([-1e6], [1e6])
+init = [1e-3]
+wl_fit_result = minimize(wl_axis_cal, init, bounds=bnds, tol= 1e-6, method='Nelder-Mead', args=(wavelength_exp, wlc, A_sim_wlc, absorption_C))
+wl_axis_fit =  wavelength_exp + wl_fit_result.x[0]
 
 A_exp_wlc = np.interp(wlc, wavelength_exp, absorption_C) 
 
@@ -246,7 +245,7 @@ plt.show()
 bnds = Bounds([200, 0.01], # lower bounds
               [4000, 1]) # upper bounds
     
-initial_guess = [T, X ] # initial guess t=290K, p=1atm, x=0.3, l = 5 (given cell values)
+initial_guess = [T, X ] # initial guess
 
 result = minimize(objective, initial_guess, bounds=bnds, tol=1e-4, method='Nelder-Mead', args=(A_exp_wlc)) # run minimizing routine
 
@@ -255,12 +254,15 @@ print(result) # print minimizing routine results
 T_fit =  T# result.x[0] # read result for T
 X_fit = X# result.x[1] # read result for P
 
-wl_min, A_minimized = hapi_calculation('CO2', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at minimized T,P,X,and L
+wl_min, A_minimized = hapi_calculation('CO', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at fitted t and x
 
 A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
-plt.figure()
-plt.plot(wl, absorp_sim) #, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
-# plt.plot(wlc, A_exp_wlc , label='Exp.')
+    
+plt.figure() # plot
+plt.plot(wlc, A_exp_wlc , label='Exp.')
+plt.plot(wlc, A_min_wlc, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
 plt.legend()
-
+plt.title("Experimental and Fitted Spectra")
+plt.xlabel("Wavelength (nm)")
+plt.ylabel("Absorption")
 plt.show()
