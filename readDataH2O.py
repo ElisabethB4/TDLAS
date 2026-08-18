@@ -108,7 +108,7 @@ from scipy.signal import find_peaks
 
 #%% Read data from .mat 
 signal_list = []
-folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
+folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
 for frame in range(1,shotCount+1):
     fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -120,7 +120,7 @@ signal_list = np.array(signal_list)
 signal = np.mean(signal_list, axis=0)
 
 bg_list = []
-folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
+folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
 for frame in range(1,500+1):
     fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -165,14 +165,15 @@ for i in range(len(randShot)):
 signal = signal - signal[0] # make starting pt ze4ro
 bg = bg - bg[0] # make starting point zero 
 
-signal_norm = signal / np.sum(signal) # normalize signal
-bg_norm =bg / np.sum(bg) # normalize bg
+signal_norm = signal.flatten() / np.max(signal) # normalize signal
+bg_norm = bg.flatten() / np.max(bg) # normalize bg
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
 
 endRamp = find_peaks(signal, height= 0.1, distance = 100)
 endRamp = endRamp[0]
-x_mask = (x >= 1000) & (x <= endRamp[-1]) # isloate the roi
+x_mask = (x >= 8700) & (x <= endRamp[-1]) # isloate the roi
+
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
 sigMasked = signal_norm[x_mask] # isolate the signal 
@@ -210,3 +211,5 @@ axs[1].plot(absorption)
 axs[1].title.set_text('Absorption')
 
 plt.show()
+
+# %%
