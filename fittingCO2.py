@@ -165,14 +165,14 @@ bg = np.mean(bg_list, axis = 0)
 signal = signal - signal[0] # make starting pt ze4ro
 bg = bg - bg[0] # make starting point zero 
 
-signal_norm = signal / np.sum(signal) # normalize signal
-bg_norm =bg / np.sum(bg) # normalize bg
+signal_norm = signal.flatten() / np.max(signal) # normalize signal
+bg_norm = bg.flatten() / np.max(bg) # normalize bg
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
 
 endRamp = find_peaks(signal, height= 0.1, distance = 50)
 endRamp = endRamp[0]
-x_mask = (x >= 2600) & (x <= 4750) # endRamp[-1]) # isloate the roi OF THE FEATURE WE WANT 
+x_mask = (x >= 2550) & (x <= 4750) # endRamp[-1]) # isloate the roi OF THE FEATURE WE WANT 
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
 sigMasked = signal_norm[x_mask] # isolate the signal 
@@ -205,11 +205,15 @@ plt.plot(x_narrow, absorption)
 plt.plot(x_narrow, absorption_C)
 plt.plot(x_narrow, line)
 plt.axhline(0)
+
+x_mask2 = (x_narrow >= 2775) & (x_narrow <= 4750) # endRamp[-1]) # isloate the roi OF THE FEATURE WE WANT 
+absorption_C = absorption_C[x_mask2]
+x_narrow = x_narrow[x_mask2]
 #%% wl axis
 sort_idx = np.argsort(x_narrow)
 xs = x_narrow[sort_idx]
 
-wavelength_exp = 4198.55 + 1.1 * (xs - xs.min()) / (xs.max() - xs.min()) 
+wavelength_exp = 4198.56 + 1.2 * (xs - xs.min()) / (xs.max() - xs.min()) 
 
 hp.db_begin('HAPI_DATA')
 
@@ -233,7 +237,7 @@ init = [1e-3]
 wl_fit_result = minimize(wl_axis_cal, init, bounds=bnds, tol= 1e-6, method='Nelder-Mead', args=(wavelength_exp, wlc, A_sim_wlc, absorption_C))
 wl_axis_fit =  wavelength_exp + wl_fit_result.x[0]
 
-A_exp_wlc = np.interp(wlc, wavelength_exp, absorption_C) 
+A_exp_wlc = np.interp(wlc, wl_axis_fit, absorption_C) 
 
 plt.figure()
 plt.plot(wlc, A_sim_wlc) #, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
