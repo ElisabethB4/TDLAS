@@ -141,7 +141,7 @@ def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
 
 #%% Read data from .mat 
 signal_list = []
-folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
+folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\DATASETS\\CO TDLAS\\2026.08.14\\2026.8.14"
 for frame in range(1,shotCount+1):
     fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -153,7 +153,7 @@ signal_list = np.array(signal_list)
 signal = np.mean(signal_list, axis=0)
 
 bg_list = []
-folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
+folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\DATASETS\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
 for frame in range(1,500+1):
     fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -266,13 +266,36 @@ wl_min, A_minimized = hapi_calculation('CO', P, T_fit, X_fit, length, resltn, af
 
 A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
     
-plt.figure() # plot
-plt.plot(wlc, A_exp_wlc , label='Exp.')
-plt.plot(wlc, A_min_wlc, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
-plt.legend()
-plt.title("Experimental and Fitted Spectra")
-plt.xlabel("Wavelength (nm)")
-plt.ylabel("Absorption")
+plt.rcParams["text.usetex"] = False
+
+nu = 1e7 / wlc  # convert wavelength in nm to wavenumber in cm^-1
+fit_transmission = 1 - A_min_wlc
+data_transmission = 1 - A_exp_wlc
+
+fig, axs = plt.subplots(2, 1, figsize=[10, 6], sharex=True)
+axs[0].plot(
+    nu,
+    fit_transmission,
+    color="tab:blue",
+    label=rf"Fit: $X = {X_fit:.3f},\ T = {T_fit:.1f}\ \mathrm{{K}},\ L = {length:.1f}\ \mathrm{{cm}}$",
+)
+axs[0].plot(
+    nu,
+    data_transmission,
+    marker="o",
+    linestyle="none",
+    color="tab:red",
+    label="Data",
+)
+axs[0].set_ylabel(r"Transmission, $1-A$")
+axs[0].legend()
+
+axs[1].plot(nu, data_transmission - fit_transmission, color="tab:purple")
+axs[1].axhline(0, color="black", linewidth=0.8)
+axs[1].set_ylabel(r"Residual, $T_{\mathrm{data}} - T_{\mathrm{fit}}$")
+axs[1].set_xlabel(r"Wavenumber, $\tilde{\nu}\ (\mathrm{cm}^{-1})$")
+
+fig.tight_layout()
 plt.show()
 
 # %%

@@ -10,14 +10,14 @@ aug12: establish fitting routine based on data reading code
 
 """
 # CHANGE THIS TO HOW MANY SAMPLES YOU TAKE !!!!
-shotCount = 100 
+shotCount = 1300 
 
 # CHANGE THIS TO THE FOLDER LOCATION
 # folderName = "C:\\Users\\ezb0082\\Downloads\\CO2_38degC_800kHz_120mA"
 
 # This can be changed to better guess T and X
-T = 550 # k
-X = 0.00525 # H2O mole fraction guess
+T = 1750 # k
+X = 0.05 # H2O mole fraction guess
 
 # change this to your experimental path length
 length = 2.54 # centimeters
@@ -41,7 +41,7 @@ def hapi_calculation(species,p, t, x, length, resltn, afwing, wnb, dnu):
                                               WavenumberRange=(wnb),
                                               WavenumberStep=(dnu),
                                               Environment={'p':p, 'T':t}, 
-                                              Diluent={'Air':(1-x)},
+                                              Diluent={'Self':x, 'Air':(1-x)},
                                               HITRAN_units=False)   
             coef_corrected = coef * x  # scale coefficent by mole fraction
             nu, absorp = hp.absorptionSpectrum(nu,coef_corrected,  # calculate absorption from abs coeff                 
@@ -139,7 +139,7 @@ def wl_axis_cal(param, waveAxis, simAxis, abs_sim, abs_data):
 
 #%% Read data from .mat 
 signal_list = []
-folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
+folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14"
 for frame in range(1,shotCount+1):
     fName = "2026.8.14_{frame:04d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
@@ -151,8 +151,8 @@ signal_list = np.array(signal_list)
 signal = np.mean(signal_list, axis=0)
 
 bg_list = []
-folderName = "C:\\Users\\elisa\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
-for frame in range(1,shotCount+1):
+folderName = "C:\\Users\\ezb0082\\OneDrive - Auburn University\\.RESEARCH\\CO TDLAS\\2026.08.14\\2026.8.14-wo_flame"
+for frame in range(1,500+1):
     fName = "2026.8.14-wo_flame_{frame:03d}.mat".format(frame=frame)
     fPath = Path(folderName, fName)
     bgdat = loadmat(fPath)
@@ -166,14 +166,15 @@ bg = np.mean(bg_list, axis=0)
 signal = signal - signal[0] # make starting pt ze4ro
 bg = bg - bg[0] # make starting point zero 
 
-signal_norm = signal / np.sum(signal) # normalize signal
-bg_norm =bg / np.sum(bg) # normalize bg
+
+signal_norm = signal.flatten() / np.max(signal) # normalize signal
+bg_norm = bg.flatten() / np.max(bg) # normalize bg
 
 x = np.arange(0, len(signal), 1) # create time arrays for x axis 
 
 endRamp = find_peaks(signal, height= 0.1, distance = 100)
 endRamp = endRamp[0]
-x_mask = (x >= 1000) & (x <= endRamp[-1]) # isloate the roi
+x_mask = (x >= 8700) & (x <= endRamp[-1]) # isloate the roi
 x_narrow = x[x_mask]  # apply the mask and convert from ns to s 
 
 sigMasked = signal_norm[x_mask] # isolate the signal 
@@ -197,15 +198,28 @@ axs[1].title.set_text('Absorption')
 
 plt.show()
 
+#%% baseline correction 
+baseline_fitter = Baseline(x_data=x_narrow)
+line, params_2 = baseline_fitter.asls(absorption, lam=1e6)
 
+absorption_C = absorption - line
+
+plt.figure()
+plt.plot(x_narrow, absorption)
+plt.plot(x_narrow, absorption_C)
+plt.plot(x_narrow, line)
+plt.axhline(0)
+
+# x_mask2 = (x_narrow >= 2775) & (x_narrow <= 4750) # endRamp[-1]) # isloate the roi OF THE FEATURE WE WANT 
+# absorption_C = absorption_C[x_mask2]
+# x_narrow = x_narrow[x_mask2]
 #%% wl axis
 sort_idx = np.argsort(x_narrow)
 xs = x_narrow[sort_idx]
 
-wavelength_exp = 2380.7 + 1.02 * (xs - xs.min()) / (xs.max() - xs.min()) 
+wavelength_exp = 1392.425 + 0.5 * (xs - xs.min()) / (xs.max() - xs.min()) 
 
 hp.db_begin('HAPI_DATA')
-
 total_pathLength = length * passes  # cm
 resltn = 0.0001 # cm-1
 afwing = resltn * 5  # instrument function width
@@ -219,34 +233,41 @@ wlc = np.arange(1392.36, 1392.95, 0.001)
 
 wl, absorp_sim = hapi_calculation('H2O', P, T, X, length, resltn, afwing, wnb, dnu) # calculate absorp. for CEA values
     
-# A_sim_wlc = np.interp(wlc, np.flip(wl), np.flip(absorp_sim))
+A_sim_wlc = np.interp(wlc, np.flip(wl), np.flip(absorp_sim))
 
-# bnds = Bounds([-1e6], [1e6])
-# init = [1e-3]
-# wl_fit_result = minimize(wl_axis_cal, init, bounds=bnds, tol= 1e-6, method='Nelder-Mead', args=(wavelength_exp, wlc, A_sim_wlc, absorption_C))
-# wl_axis_fit =  wavelength_exp + wl_fit_result.x[0]
+bnds = Bounds([-1e6], [1e6])
+init = [1e-3]
+wl_fit_result = minimize(wl_axis_cal, init, bounds=bnds, tol= 1e-6, method='Nelder-Mead', args=(wavelength_exp, wlc, A_sim_wlc, absorption_C))
+wl_axis_fit =  wavelength_exp + wl_fit_result.x[0]
 
-A_exp_wlc = np.interp(wlc, wavelength_exp, absorption) 
+A_exp_wlc = np.interp(wlc, wl_axis_fit, absorption_C) 
+
+plt.figure()
+plt.plot(wlc, A_sim_wlc) #, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
+plt.plot(wlc, A_exp_wlc , label='Exp.')
+plt.legend()
+
+plt.show()
 
 #%% Fitting 
-bnds = Bounds([200, 0.01], # lower bounds
-              [4000, 1]) # upper bounds
+# bnds = Bounds([200, 0.001], # lower bounds
+#               [4000, 1]) # upper bounds
     
-initial_guess = [T, X ] # initial guess t=290K, p=1atm, x=0.3, l = 5 (given cell values)
+# initial_guess = [T, X ] # initial guess
 
 # result = minimize(objective, initial_guess, bounds=bnds, tol=1e-4, method='Nelder-Mead', args=(A_exp_wlc)) # run minimizing routine
 
 # print(result) # print minimizing routine results
 
-T_fit =  T# result.x[0] # read result for T
-X_fit = X# result.x[1] # read result for P
+# T_fit =   result.x[0] # read result for T
+# X_fit =  result.x[1] # read result for P
 
 # wl_min, A_minimized = hapi_calculation('H2O', P, T_fit, X_fit, length, resltn, afwing, wnb, dnu)  # calculate absorb at minimized T,P,X,and L
 
 # A_min_wlc = np.interp(wlc, np.flip(wl_min), np.flip(A_minimized)) # interpolate minimized to common scale
-plt.figure()
-plt.plot(wl, absorp_sim) #, label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
-plt.plot(wlc, A_exp_wlc , label='Exp.')
-plt.legend()
 
-plt.show()
+# plt.figure()
+# plt.plot(wlc, A_min_wlc,  label='Fit T = {:.2f} K, X = {:.3f}'.format(T_fit, X_fit))
+# plt.plot(wlc, A_exp_wlc , label='Exp.')
+# plt.legend()
+
